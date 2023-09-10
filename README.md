@@ -8,7 +8,7 @@ Build
 
     $ rebar3 compile
 
-Build
+Test
 -----
 
     $ rebar3 eunit
