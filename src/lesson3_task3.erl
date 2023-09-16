@@ -1,4 +1,5 @@
 -module(lesson3_task3).
+
 -export([split/2]).
 
 split(BinText, Delimiter) ->
@@ -9,6 +10,6 @@ split(BinText, Delimiter, Acc, CurrentPart) ->
   BinDelim = list_to_binary(Delimiter),
   case BinText of
     <<BinDelim:DelimSize/binary, Rest/binary>> -> split(Rest, Delimiter, [CurrentPart | Acc], <<>>);
-    <<Char, Rest/binary>> -> split(Rest, Delimiter, Acc, <<CurrentPart/binary, Char/utf8>>);
+    <<Char/utf8, Rest/binary>> -> split(Rest, Delimiter, Acc, <<CurrentPart/binary, Char/utf8>>);
     <<>> -> lists:reverse([CurrentPart | Acc])
   end.

@@ -14,8 +14,10 @@
 -define(FALSE, "false").
 -define(IS_SPACE(Char),
   Char == 10;
-  Char == 32
+  Char == 32;
+  Char == "\n"
 ).
+-define(EMPTY, "").
 
 decode(Json, Format) ->
   case Format of
@@ -35,7 +37,10 @@ decode_proplist(<<Char, Rest/binary>>, PropList) when ?IS_SPACE(Char) ->
 decode_proplist(<<?CLOSE_CURLY_BRACE>>, PropList) ->
   lists:reverse(PropList);
 decode_proplist(<<?CLOSE_CURLY_BRACE, Rest/binary>>, PropList) ->
-  {lists:reverse(PropList), Rest}.
+  case delete(Rest) of
+    <<?EMPTY>> -> lists:reverse(PropList);
+    Rest1 -> {lists:reverse(PropList), Rest1}
+  end.
 
 decode_map(<<?COMMA, Rest/binary>>, Map) ->
   {Key, Value, Rest1} = tokenize(Rest, <<>>, <<>>, map),
@@ -48,7 +53,10 @@ decode_map(<<Char, Rest/binary>>, Map) when ?IS_SPACE(Char) ->
 decode_map(<<?CLOSE_CURLY_BRACE>>, Map) ->
   Map;
 decode_map(<<?CLOSE_CURLY_BRACE, Rest/binary>>, Map) ->
-  {Map, Rest}.
+  case delete(Rest) of
+    <<?EMPTY>> -> Map;
+    Rest1 -> {Map, Rest1}
+  end.
 
 tokenize(<<?SINGLE_QUOTE, Rest/binary>>, <<>>, <<>> = Value, Flag) ->
   {Key, Rest1} = tokenize_name(Rest, <<>>),
@@ -71,13 +79,13 @@ tokenize(Rest, Key, <<>>, _) ->
   {Value, Rest1} = tokenize_number(Rest, <<>>),
   {Key, Value, Rest1}.
 
-tokenize_list(<<?OPEN_CURLY_BRACE, _/binary>> = Rest, List, Format) ->
+tokenize_list(<<?OPEN_CURLY_BRACE, _/binary>> = Rest, List, Flag) ->
   {Value, Rest1} =
-    case Format of
+    case Flag of
       map -> decode_map(Rest, maps:new());
       proplist -> decode_proplist(Rest, [])
     end,
-  tokenize_list(Rest1, [Value | List], Format);
+  tokenize_list(Rest1, [Value | List], Flag);
 tokenize_list(<<?SINGLE_QUOTE, Rest/binary>>, List, Flag) ->
   {Name, Rest1} = tokenize_name(Rest, <<>>),
   tokenize_list(Rest1, [Name | List], Flag);
@@ -88,12 +96,17 @@ tokenize_list(<<?CLOSE_SQUARE_BRACKET, Rest/binary>>, List, _) ->
 tokenize_list(<<Char, Rest/binary>>, List, Flag) when ?IS_SPACE(Char) ->
   tokenize_list(Rest, List, Flag).
 
+tokenize_name(<<?SINGLE_QUOTE, Rest/binary>>, Name) ->
+  {Name, Rest};
+tokenize_name(<<Char, Rest/binary>>, Name)->
+  tokenize_name(Rest, <<Name/binary, Char>>).
+
 tokenize_number(<<?COMMA, _/binary>> = Rest, Number) ->
   {binary_to_integer(Number), Rest};
 tokenize_number(<<Char:1/binary, Rest/binary>>, Number) ->
   tokenize_number(Rest, <<Number/binary, Char/binary>>).
 
-tokenize_name(<<?SINGLE_QUOTE, Rest/binary>>, Name) ->
-  {Name, Rest};
-tokenize_name(<<Char, Rest/binary>>, Name)->
-  tokenize_name(Rest, <<Name/binary, Char>>).
+delete(<<Char, Rest/binary>>) when ?IS_SPACE(Char) ->
+  delete(Rest);
+delete(Rest) ->
+  Rest.
